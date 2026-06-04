@@ -8,17 +8,25 @@ import ContentCutIcon from '@mui/icons-material/ContentCut';
 import GroupIcon from '@mui/icons-material/Group';
 import PaymentsIcon from '@mui/icons-material/Payments';
 import { useNavigate, useLocation } from 'react-router-dom';
+import { useRoleAccess } from '../../shared/hooks/useRoleAccess';
+import type { UserRole } from '../../shared/types/auth.types';
 
 const DRAWER_WIDTH = 260;
 const MINI_DRAWER_WIDTH = 72;
+interface MenuItemDef {
+  text: string;
+  icon: React.ReactNode;
+  path: string;
+  minRole?: UserRole;
+}
 
-const menuItems = [
+const menuItems: MenuItemDef[] = [
   { text: 'Dashboard', icon: <DashboardIcon />, path: '/' },
   { text: 'Appointments', icon: <EventIcon />, path: '/scheduler' },
-  { text: 'Customers', icon: <PeopleIcon />, path: '/customers' },
-  { text: 'Services', icon: <ContentCutIcon />, path: '/services' },
-  { text: 'Staff', icon: <GroupIcon />, path: '/staff' },
-  { text: 'Payments', icon: <PaymentsIcon />, path: '/payments' },
+  { text: 'Customers', icon: <PeopleIcon />, path: '/customers', minRole: 'RECEPTIONIST' },
+  { text: 'Services', icon: <ContentCutIcon />, path: '/services', minRole: 'MANAGER' },
+  { text: 'Staff', icon: <GroupIcon />, path: '/staff', minRole: 'MANAGER' },
+  { text: 'Payments', icon: <PaymentsIcon />, path: '/payments', minRole: 'RECEPTIONIST' },
 ];
 
 interface SidebarProps {
@@ -30,6 +38,7 @@ interface SidebarProps {
 export const Sidebar = ({ mobileOpen, desktopOpen, onClose }: SidebarProps) => {
   const navigate = useNavigate();
   const location = useLocation();
+  const { hasMinRole } = useRoleAccess();
 
   const currentWidth = desktopOpen ? DRAWER_WIDTH : MINI_DRAWER_WIDTH;
 
@@ -46,38 +55,45 @@ export const Sidebar = ({ mobileOpen, desktopOpen, onClose }: SidebarProps) => {
         </IconButton>
       </Toolbar>
       <Box sx={{ overflowX: 'hidden', overflowY: 'auto', mt: 2, flexGrow: 1 }}>
-      <List sx={{ px: 2 }}>
-        {menuItems.map((item) => {
-          const isActive = location.pathname === item.path;
-          return (
-            <ListItem key={item.text} disablePadding sx={{ mb: 1, display: 'block' }}>
-              <ListItemButton
-                onClick={() => {
-                  navigate(item.path);
-                  if (window.innerWidth < 900) onClose(); // Only close on mobile
-                }}
-                sx={{
-                  minHeight: 48,
-                  justifyContent: isExpanded ? 'initial' : 'center',
-                  px: 2.5,
-                  borderRadius: 'var(--border-radius)',
-                  backgroundColor: isActive ? 'var(--primary-light)' : 'transparent',
-                  color: isActive ? 'var(--primary-contrastText)' : 'var(--text-secondary)',
-                  '&:hover': {
-                    backgroundColor: isActive ? 'var(--primary-main)' : 'rgba(0,0,0,0.04)',
-                    color: isActive ? 'var(--primary-contrastText)' : 'var(--primary-main)',
-                  }
-                }}
-              >
-                <ListItemIcon sx={{ color: 'inherit', minWidth: 0, mr: isExpanded ? 3 : 'auto', justifyContent: 'center' }}>
-                  {item.icon}
-                </ListItemIcon>
-                <ListItemText primary={<Typography sx={{ fontWeight: isActive ? 600 : 500 }}>{item.text}</Typography>} sx={{ opacity: isExpanded ? 1 : 0 }} />
-              </ListItemButton>
-            </ListItem>
-          );
-        })}
-      </List>
+        <List sx={{ px: 2 }}>
+          {menuItems.map((item) => {
+            if (item.minRole && !hasMinRole(item.minRole)) {
+              return null; // Hide item if user doesn't have required role
+            }
+            const isActive = location.pathname === item.path;
+            return (
+              <ListItem key={item.text} disablePadding sx={{ mb: 1, display: 'block' }}>
+                <ListItemButton
+                  onClick={() => {
+                    navigate(item.path);
+                    if (window.innerWidth < 900) onClose(); // Only close on mobile
+                  }}
+                  sx={{
+                    minHeight: 48,
+                    justifyContent: isExpanded ? 'initial' : 'center',
+                    px: 2.5,
+                    borderRadius: 'var(--border-radius)',
+                    backgroundColor: isActive ? 'var(--primary-light)' : 'transparent',
+                    color: isActive ? 'var(--primary-contrastText)' : 'var(--text-secondary)',
+                    '&:hover': {
+                      backgroundColor: isActive ? 'var(--primary-main)' : 'rgba(0,0,0,0.04)',
+                      color: isActive ? 'var(--primary-contrastText)' : 'var(--primary-main)',
+                    }
+                  }}
+                >
+                  <ListItemIcon sx={{ color: 'inherit', minWidth: 0, mr: isExpanded ? 3 : 'auto', justifyContent: 'center' }}>
+                    {item.icon}
+                  </ListItemIcon>
+                  <ListItemText 
+                    primary={item.text} 
+                    slotProps={{ primary: { sx: { fontWeight: isActive ? 600 : 500 } } }}
+                    sx={{ opacity: isExpanded ? 1 : 0 }} 
+                  />
+                </ListItemButton>
+              </ListItem>
+            );
+          })}
+        </List>
       </Box>
     </Box>
   );
@@ -97,7 +113,7 @@ export const Sidebar = ({ mobileOpen, desktopOpen, onClose }: SidebarProps) => {
       >
         {renderDrawerContent(true)}
       </Drawer>
-      
+
       {/* Desktop Drawer */}
       <Drawer
         variant="permanent"
@@ -106,10 +122,10 @@ export const Sidebar = ({ mobileOpen, desktopOpen, onClose }: SidebarProps) => {
           width: currentWidth,
           flexShrink: 0,
           whiteSpace: 'nowrap',
-          '& .MuiDrawer-paper': { 
-            boxSizing: 'border-box', 
-            width: currentWidth, 
-            backgroundColor: 'var(--bg-paper)', 
+          '& .MuiDrawer-paper': {
+            boxSizing: 'border-box',
+            width: currentWidth,
+            backgroundColor: 'var(--bg-paper)',
             borderRight: '1px solid var(--border-color)',
             transition: 'width 0.2s',
             overflowX: 'hidden'

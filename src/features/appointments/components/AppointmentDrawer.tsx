@@ -3,25 +3,23 @@ import {
   Drawer, Box, CircularProgress, Typography, Alert, Button, IconButton, TextField, Autocomplete, Divider, Chip, Menu, MenuItem
 } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
-import EditIcon from '@mui/icons-material/Edit';
-import DeleteIcon from '@mui/icons-material/Delete';
-import AddIcon from '@mui/icons-material/Add';
-import AccessTimeIcon from '@mui/icons-material/AccessTime';
-import PersonIcon from '@mui/icons-material/Person';
-import NotesIcon from '@mui/icons-material/Notes';
-import MoreVertIcon from '@mui/icons-material/MoreVert';
 import dayjs from 'dayjs';
 import { useAuth } from '../../../app/providers/AuthContext';
+import { useRoleAccess } from '../../../shared/hooks/useRoleAccess';
 import { appointmentApi } from '../../../shared/api/appointment.api';
 import { customerApi } from '../../../shared/api/customer.api';
 import { serviceApi } from '../../../shared/api/service.api';
 import type { Customer } from '../../../shared/types/customer.types';
 import type { User } from '../../../shared/types/user.types';
 import type { Service } from '../../../shared/types/service.types';
-import type { FullAppointment, CreateAppointmentRequest, CreateAppointmentServiceItemRequest, CreateAppointmentServiceStaffRequest } from '../../../shared/types/appointment.types';
+import type { FullAppointment } from '../../../shared/types/appointment.types';
 import type { PaymentTransaction } from '../../../shared/types/payment.types';
 import { paymentApi } from '../../../shared/api/payment.api';
 import { PaymentDialog } from '../../payments/components/PaymentDialog';
+
+import { AppointmentViewMode } from './drawer/AppointmentViewMode';
+import { AppointmentFormMode } from './drawer/AppointmentFormMode';
+import type { ServiceSelection } from './drawer/AppointmentFormMode';
 
 export type DrawerMode = 'VIEW' | 'EDIT' | 'CREATE';
 
@@ -35,19 +33,16 @@ interface AppointmentDrawerProps {
   staffList: User[];
   initialStartTime?: string;
   initialStaffId?: number;
+  initialDate?: string;
 }
 
-interface ServiceSelection {
-  id: string; // frontend key
-  serviceId: number | '';
-  notes: string;
-  assignedStaffIds: number[];
-}
+
 
 const DRAWER_WIDTH = 500; // Wide drawer for complex forms
 
-export const AppointmentDrawer = ({ open, mode, setMode, appointment, onClose, onSuccess, staffList, initialStartTime, initialStaffId }: AppointmentDrawerProps) => {
+export const AppointmentDrawer = ({ open, mode, setMode, appointment, onClose, onSuccess, staffList, initialStartTime, initialStaffId, initialDate }: AppointmentDrawerProps) => {
   const { user } = useAuth();
+  const { hasMinRole } = useRoleAccess();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -114,7 +109,7 @@ export const AppointmentDrawer = ({ open, mode, setMode, appointment, onClose, o
       if (mode === 'CREATE') {
         const now = dayjs();
         let defaultStartTime = now.format('HH:mm');
-        let defaultDate = now.format('YYYY-MM-DD');
+        let defaultDate = initialDate || now.format('YYYY-MM-DD');
         let defaultServices: ServiceSelection[] = [];
 
         if (initialStartTime) {
@@ -123,7 +118,7 @@ export const AppointmentDrawer = ({ open, mode, setMode, appointment, onClose, o
 
         if (initialStaffId) {
           defaultServices = [{
-            id: crypto.randomUUID(),
+            id: Date.now().toString(),
             serviceId: '',
             assignedStaffIds: [initialStaffId],
             notes: ''
@@ -168,7 +163,7 @@ export const AppointmentDrawer = ({ open, mode, setMode, appointment, onClose, o
   }, [open, user, mode, appointment]);
 
   const loadPayments = async () => {
-    if (appointment && mode === 'VIEW') {
+    if (appointment && mode === 'VIEW' && hasMinRole('RECEPTIONIST')) {
       try {
         const data = await paymentApi.getByAppointmentId(appointment.appointmentId);
         setPayments(data);
@@ -303,311 +298,7 @@ export const AppointmentDrawer = ({ open, mode, setMode, appointment, onClose, o
     }
   };
 
-  const renderViewMode = () => {
-    if (!appointment) return null;
-    return (
-      <Box sx={{ p: 4, display: 'flex', flexDirection: 'column', gap: 3 }}>
-        {error && <Alert severity="error">{error}</Alert>}
 
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <Typography variant="h5" sx={{ fontWeight: 700 }} color="primary">{appointment.customerName}</Typography>
-          <Box sx={{ display: 'flex', gap: 1 }}>
-            {appointment.appointmentStatus === 'SCHEDULED' && (
-              <>
-                <Button variant="outlined" color="info" size="small" sx={{ borderRadius: '24px' }} disabled={isLoading} onClick={() => handleQuickStatusUpdate('IN_PROGRESS')}>
-                  Start
-                </Button>
-                <Button variant="outlined" color="error" size="small" sx={{ borderRadius: '24px' }} disabled={isLoading} onClick={() => handleQuickStatusUpdate('NO_SHOW')}>
-                  No Show
-                </Button>
-              </>
-            )}
-            {appointment.appointmentStatus === 'IN_PROGRESS' && (
-              <Button variant="outlined" color="success" size="small" sx={{ borderRadius: '24px' }} disabled={isLoading} onClick={() => handleQuickStatusUpdate('COMPLETED')}>
-                Complete
-              </Button>
-            )}
-            <Button startIcon={<EditIcon />} variant="contained" size="small" sx={{ borderRadius: '24px' }} onClick={() => setMode('EDIT')}>
-              Edit
-            </Button>
-          </Box>
-        </Box>
-
-        <Divider />
-
-        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-            <AccessTimeIcon color="action" />
-            <Typography variant="body1">
-              {dayjs(appointment.appointmentStartTime).format('dddd, MMM D, YYYY')} <br />
-              {dayjs(appointment.appointmentStartTime).format('h:mm A')} - {dayjs(appointment.appointmentEndTime).format('h:mm A')}
-            </Typography>
-          </Box>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-            <PersonIcon color="action" />
-            <Typography variant="body1">Customer ID: {appointment.customerId}</Typography>
-          </Box>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-            <NotesIcon color="action" />
-            <Typography variant="body1">{appointment.notes || 'No notes provided.'}</Typography>
-          </Box>
-        </Box>
-
-        <Divider />
-
-        <Typography variant="h6" sx={{ fontWeight: 600 }}>Services</Typography>
-        {appointment.serviceItems.map((si, i) => (
-          <Box key={si.appointmentServiceItemId} sx={{ p: 2, background: 'rgba(0,0,0,0.03)', borderRadius: '12px' }}>
-            <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>{si.serviceName}</Typography>
-            <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>{si.notes || 'No specific notes'}</Typography>
-            <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
-              {si.assignedStaff.map(staff => (
-                <Chip key={staff.appointmentServiceStaffId} label={staff.staffUserName} size="small" color="primary" variant="outlined" />
-              ))}
-            </Box>
-          </Box>
-        ))}
-
-        <Divider />
-
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <Typography variant="h6" sx={{ fontWeight: 600 }}>Payments & Billing</Typography>
-        </Box>
-
-        <Box sx={{ p: 2, borderRadius: '12px', background: 'rgba(25, 118, 210, 0.05)', border: '1px solid rgba(25, 118, 210, 0.2)', display: 'flex', flexDirection: 'column', gap: 2 }}>
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <Typography variant="body1" color="text.secondary">Final Amount:</Typography>
-            <Typography variant="h6" sx={{ fontWeight: 700 }}>₹{appointment.finalAmount || 0}</Typography>
-          </Box>
-
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <Typography variant="body1" color="text.secondary">Amount Paid:</Typography>
-            <Typography variant="h6" color="success.main" sx={{ fontWeight: 700 }}>₹{amountPaid}</Typography>
-          </Box>
-
-          <Divider sx={{ borderStyle: 'dashed' }} />
-
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <Typography variant="body1" sx={{ fontWeight: 600 }}>
-              {remainingBalance < 0 ? 'Overpaid (Refund Due):' : 'Balance Due:'}
-            </Typography>
-            <Typography variant="h5" color={remainingBalance !== 0 ? "error.main" : "text.primary"} sx={{ fontWeight: 700 }}>
-              ₹{Math.abs(remainingBalance)}
-            </Typography>
-          </Box>
-
-          {remainingBalance > 0 && (
-            <Button
-              variant="contained"
-              fullWidth
-              size="large"
-              sx={{ mt: 1, borderRadius: '24px' }}
-              onClick={() => setIsPaymentDialogOpen(true)}
-            >
-              Record Payment
-            </Button>
-          )}
-        </Box>
-
-        {payments.length > 0 && (
-          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-            <Typography variant="subtitle2" color="text.secondary">Transaction History</Typography>
-            {payments.map(payment => (
-              <Box key={payment.transactionId} sx={{ p: 2, background: 'rgba(0,0,0,0.03)', borderRadius: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <Box>
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                    <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>{payment.paymentMode}</Typography>
-                    {payment.transactionStatus !== 'SUCCESS' && (
-                      <Chip label={payment.transactionStatus} size="small" color={payment.transactionStatus === 'REFUNDED' ? 'warning' : 'error'} sx={{ height: 20, fontSize: '0.7rem' }} />
-                    )}
-                  </Box>
-                  <Typography variant="caption" color="text.secondary">{dayjs(payment.createdAt).format('MMM D, YYYY h:mm A')}</Typography>
-                </Box>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                  <Typography variant="subtitle1" sx={{ fontWeight: 700, textDecoration: payment.transactionStatus !== 'SUCCESS' ? 'line-through' : 'none', color: payment.transactionStatus !== 'SUCCESS' ? 'text.secondary' : 'text.primary' }}>
-                    ₹{payment.amount}
-                  </Typography>
-                  {payment.transactionStatus === 'SUCCESS' && (
-                    <IconButton size="small" onClick={(e) => handleMenuClick(e, payment.transactionId)}>
-                      <MoreVertIcon fontSize="small" />
-                    </IconButton>
-                  )}
-                </Box>
-              </Box>
-            ))}
-          </Box>
-        )}
-
-        <Menu
-          anchorEl={anchorEl}
-          open={Boolean(anchorEl)}
-          onClose={handleMenuClose}
-        >
-          <MenuItem onClick={() => handleUpdateTransactionStatus('REFUNDED')}>Mark as Refunded</MenuItem>
-          <MenuItem onClick={() => handleUpdateTransactionStatus('FAILED')}>Mark as Failed</MenuItem>
-        </Menu>
-      </Box>
-    );
-  };
-
-  const renderFormMode = () => (
-    <Box component="form" onSubmit={handleSubmit} sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-      <Box sx={{ flexGrow: 1, overflowY: 'auto', p: 4, display: 'flex', flexDirection: 'column', gap: 3 }}>
-        <Typography variant="h5" sx={{ fontWeight: 700 }} color="primary">
-          {mode === 'CREATE' ? 'New Appointment' : 'Edit Appointment'}
-        </Typography>
-
-        {error && <Alert severity="error">{error}</Alert>}
-
-        <Typography variant="subtitle1" sx={{ fontWeight: 600 }} color="text.primary">1. Appointment Details</Typography>
-
-        <Autocomplete
-          options={customers}
-          getOptionLabel={(option) => `${option.customerName} - ${option.phoneNumber || 'No Phone'}`}
-          value={customers.find(c => c.customerId.toString() === formData.customerId) || null}
-          onChange={(e, newValue) => {
-            setFormData({ ...formData, customerId: newValue ? newValue.customerId.toString() : '' });
-          }}
-          renderInput={(params) => (
-            <TextField {...params} label="Search & Select Customer" required fullWidth />
-          )}
-        />
-
-        <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2 }}>
-          <TextField label="Date" name="appointmentDate" type="date" value={formData.appointmentDate} onChange={handleChange} required fullWidth />
-          <TextField
-            select
-            label="Status"
-            name="appointmentStatus"
-            value={formData.appointmentStatus}
-            onChange={handleChange}
-            fullWidth
-            disabled={mode === 'CREATE'}
-          >
-            <MenuItem value="SCHEDULED">Scheduled</MenuItem>
-            <MenuItem value="IN_PROGRESS">In Progress</MenuItem>
-            <MenuItem value="COMPLETED">Completed</MenuItem>
-            <MenuItem value="NO_SHOW">No Show</MenuItem>
-            <MenuItem value="CANCELLED">Cancelled</MenuItem>
-          </TextField>
-          <TextField label="Start Time" name="startTime" type="time" value={formData.startTime} onChange={handleChange} required fullWidth />
-          <TextField label="End Time" name="endTime" type="time" value={formData.endTime} onChange={handleChange} required fullWidth />
-        </Box>
-
-        <TextField label="Notes" name="notes" value={formData.notes} onChange={handleChange} multiline rows={2} fullWidth />
-
-        <Divider sx={{ my: 1 }} />
-
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <Typography variant="subtitle1" sx={{ fontWeight: 600 }} color="text.primary">2. Services & Staff</Typography>
-          <Button startIcon={<AddIcon />} variant="outlined" onClick={handleAddService} size="small" sx={{ borderRadius: '24px' }}>
-            Add Service
-          </Button>
-        </Box>
-
-        {selectedServices.length === 0 && (
-          <Typography variant="body2" color="text.secondary" sx={{ fontStyle: 'italic', textAlign: 'center', py: 2 }}>
-            Please add at least one service to this appointment.
-          </Typography>
-        )}
-
-        {selectedServices.map((svc, index) => {
-          const selectedSvcObj = services.find(s => s.serviceId === svc.serviceId);
-          return (
-            <Box key={svc.id} sx={{ p: 2, border: '1px solid var(--border-color)', borderRadius: '12px', background: 'rgba(255,255,255,0.02)', display: 'flex', flexDirection: 'column', gap: 2 }}>
-              <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr auto', gap: 2, alignItems: 'center' }}>
-                <Autocomplete
-                  options={services}
-                  getOptionLabel={(option) => `${option.name}`}
-                  value={selectedSvcObj || null}
-                  onChange={(e, newValue) => {
-                    handleServiceChange(svc.id, 'serviceId', newValue ? newValue.serviceId : '');
-                  }}
-                  renderInput={(params) => (
-                    <TextField {...params} label="Service" required size="small" />
-                  )}
-                />
-
-                <Autocomplete
-                  multiple
-                  options={staffList}
-                  getOptionLabel={(option) => `${option.userName}`}
-                  value={staffList.filter(s => svc.assignedStaffIds.includes(s.userId))}
-                  onChange={(e, newValue) => {
-                    handleServiceChange(svc.id, 'assignedStaffIds', newValue.map(v => v.userId));
-                  }}
-                  renderInput={(params) => (
-                    <TextField {...params} label="Staff" required={svc.assignedStaffIds.length === 0} size="small" />
-                  )}
-                />
-
-                <IconButton size="small" color="error" onClick={() => handleRemoveService(svc.id)}>
-                  <DeleteIcon fontSize="small" />
-                </IconButton>
-              </Box>
-
-              <Box sx={{ display: 'flex', gap: 3, px: 1, alignItems: 'center' }}>
-                <Typography variant="body2" color="text.secondary">
-                  Duration: <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{selectedSvcObj ? `${selectedSvcObj.estimatedDurationMinutes}m` : '-'}</span>
-                </Typography>
-                <Typography variant="body2" color="text.secondary">
-                  Price: <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{selectedSvcObj ? `₹${selectedSvcObj.defaultPrice}` : '-'}</span>
-                </Typography>
-                <TextField
-                  label="Notes (Optional)"
-                  value={svc.notes}
-                  onChange={(e) => handleServiceChange(svc.id, 'notes', e.target.value)}
-                  size="small"
-                  variant="standard"
-                  sx={{ flexGrow: 1, ml: 2 }}
-                />
-              </Box>
-            </Box>
-          )
-        })}
-
-        <Divider sx={{ my: 1 }} />
-
-        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1, alignItems: 'flex-end', mr: 2 }}>
-          <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
-            <Typography variant="body1" color="text.secondary">Subtotal:</Typography>
-            <Typography variant="h6">₹{subtotal}</Typography>
-          </Box>
-          <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
-            <Typography variant="body1" color="text.secondary">Discount (₹):</Typography>
-            <TextField
-              name="discountAmount"
-              type="number"
-              size="small"
-              sx={{ width: '120px' }}
-              value={formData.discountAmount}
-              onChange={handleChange}
-              onWheel={(e) => (e.target as HTMLElement).blur()}
-            />
-          </Box>
-          <Box sx={{ display: 'flex', gap: 2, alignItems: 'center', mt: 1 }}>
-            <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>Final Amount:</Typography>
-            <Typography variant="h5" color="primary" sx={{ fontWeight: 700 }}>₹{finalAmount}</Typography>
-          </Box>
-        </Box>
-      </Box>
-
-      <Box sx={{ p: 3, borderTop: '1px solid var(--border-color)', display: 'flex', justifyContent: 'flex-end', gap: 2, background: 'var(--bg-paper)' }}>
-        <Button onClick={mode === 'EDIT' ? () => setMode('VIEW') : onClose} disabled={isLoading} sx={{ color: 'var(--text-secondary)' }}>
-          Cancel
-        </Button>
-        <Button
-          type="submit"
-          variant="contained"
-          disabled={isLoading}
-          startIcon={isLoading ? <CircularProgress size={20} /> : undefined}
-          sx={{ px: 4 }}
-        >
-          {mode === 'CREATE' ? 'Create Appointment' : 'Save Changes'}
-        </Button>
-      </Box>
-    </Box>
-  );
 
   return (
     <Drawer
@@ -630,7 +321,41 @@ export const AppointmentDrawer = ({ open, mode, setMode, appointment, onClose, o
       <Box sx={{ display: 'flex', justifyContent: 'space-between', p: 2, borderBottom: '1px solid var(--border-color)' }}>
         <IconButton onClick={onClose} size="small"><CloseIcon /></IconButton>
       </Box>
-      {mode === 'VIEW' ? renderViewMode() : renderFormMode()}
+      {mode === 'VIEW' ? (
+        <AppointmentViewMode
+          appointment={appointment}
+          error={error}
+          isLoading={isLoading}
+          payments={payments}
+          amountPaid={amountPaid}
+          remainingBalance={remainingBalance}
+          handleQuickStatusUpdate={handleQuickStatusUpdate}
+          setMode={setMode}
+          setIsPaymentDialogOpen={setIsPaymentDialogOpen}
+          handleUpdateTransactionStatus={handleUpdateTransactionStatus}
+          anchorEl={anchorEl}
+          setAnchorEl={setAnchorEl}
+          selectedTransactionId={selectedTransactionId}
+          setSelectedTransactionId={setSelectedTransactionId}
+        />
+      ) : (
+        <AppointmentFormMode
+          mode={mode}
+          formData={formData}
+          setFormData={setFormData}
+          selectedServices={selectedServices}
+          setSelectedServices={setSelectedServices}
+          customers={customers}
+          services={services}
+          staffList={staffList}
+          subtotal={subtotal}
+          finalAmount={finalAmount}
+          isLoading={isLoading}
+          error={error}
+          handleSubmit={handleSubmit}
+          onCancel={mode === 'EDIT' ? () => setMode('VIEW') : onClose}
+        />
+      )}
 
       {appointment && user && (
         <PaymentDialog
