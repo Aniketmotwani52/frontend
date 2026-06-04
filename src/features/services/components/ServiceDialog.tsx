@@ -107,6 +107,11 @@ export const ServiceDialog = ({ open, onClose, onSuccess, serviceToEdit }: Servi
     <Dialog 
       open={open} 
       onClose={onClose}
+      slotProps={{
+        backdrop: {
+          sx: { backgroundColor: 'rgba(0, 0, 0, 0.2)' }
+        }
+      }}
       sx={{
         '& .MuiDialog-paper': {
           background: 'var(--glass-bg)',
@@ -139,28 +144,29 @@ export const ServiceDialog = ({ open, onClose, onSuccess, serviceToEdit }: Servi
 
             <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 3 }}>
               <TextField
-                label="Price"
+                label="Default Price"
                 name="defaultPrice"
                 type="number"
                 value={formData.defaultPrice}
                 onChange={handleChange}
+                onWheel={(e) => (e.target as HTMLElement).blur()}
                 required
                 fullWidth
                 slotProps={{
-                  htmlInput: { step: "0.01", min: "0" }
+                  htmlInput: { min: "0", step: "0.01" }
                 }}
               />
-              
               <TextField
-                label="Duration (min)"
+                label="Estimated Duration (minutes)"
                 name="estimatedDurationMinutes"
                 type="number"
                 value={formData.estimatedDurationMinutes}
                 onChange={handleChange}
+                onWheel={(e) => (e.target as HTMLElement).blur()}
                 required
                 fullWidth
                 slotProps={{
-                  htmlInput: { step: "1", min: "1" }
+                  htmlInput: { min: "1", step: "1" }
                 }}
               />
             </Box>

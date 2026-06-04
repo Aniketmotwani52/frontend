@@ -41,7 +41,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       if (decoded && decoded.exp * 1000 > Date.now()) {
         setUser({
           username: decoded.sub,
-          userId: decoded.userId,
+          userId: Number(decoded.sub), // JWT subject is the userId
           orgId: decoded.orgId,
           role: decoded.role,
         });
@@ -59,7 +59,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     if (decoded) {
       setUser({
         username: decoded.sub,
-        userId: decoded.userId,
+        userId: Number(decoded.sub), // JWT subject is the userId
         orgId: decoded.orgId,
         role: decoded.role,
       });

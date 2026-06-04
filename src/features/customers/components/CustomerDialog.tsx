@@ -93,6 +93,13 @@ export const CustomerDialog = ({ open, onClose, onSuccess, customerToEdit }: Cus
     <Dialog
       open={open}
       onClose={onClose}
+      maxWidth="sm"
+      fullWidth
+      slotProps={{
+        backdrop: {
+          sx: { backgroundColor: 'rgba(0, 0, 0, 0.2)' }
+        }
+      }}
       sx={{
         '& .MuiDialog-paper': {
           background: 'var(--glass-bg)',
