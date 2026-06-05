@@ -113,8 +113,8 @@ export const ServiceList = () => {
                     )}
                   </TableCell>
                   <TableCell>
-                    {service.category ? (
-                      <Chip label={service.category} size="small" variant="outlined" />
+                    {service.categoryName ? (
+                      <Chip label={service.categoryName} size="small" variant="outlined" />
                     ) : (
                       '-'
                     )}

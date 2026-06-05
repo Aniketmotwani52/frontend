@@ -4,7 +4,8 @@ import {
   Button, TextField, Box, CircularProgress, Alert, MenuItem, InputAdornment
 } from '@mui/material';
 import type { Service, CreateServiceRequest, UpdateServiceRequest } from '../../../shared/types/service.types';
-import { serviceApi } from '../../../shared/api/service.api';
+import { useQuery } from '@tanstack/react-query';
+import { serviceApi, serviceCategoryApi } from '../../../shared/api/service.api';
 import { useAuth } from '../../../app/providers/AuthContext';
 
 interface ServiceDialogProps {
@@ -14,9 +15,7 @@ interface ServiceDialogProps {
   serviceToEdit?: Service | null;
 }
 
-const CATEGORY_OPTIONS = [
-  'Haircut', 'Coloring', 'Styling', 'Makeup', 'Nails', 'Spa', 'Massage', 'Other'
-];
+// Removed hardcoded CATEGORY_OPTIONS
 
 export const ServiceDialog = ({ open, onClose, onSuccess, serviceToEdit }: ServiceDialogProps) => {
   const { user } = useAuth();
@@ -24,7 +23,7 @@ export const ServiceDialog = ({ open, onClose, onSuccess, serviceToEdit }: Servi
   const [formData, setFormData] = useState({
     name: '',
     description: '',
-    category: '',
+    categoryId: '' as number | '',
     defaultPrice: '',
     estimatedDurationMinutes: ''
   });
@@ -32,19 +31,25 @@ export const ServiceDialog = ({ open, onClose, onSuccess, serviceToEdit }: Servi
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
 
+  const { data: categories } = useQuery({
+    queryKey: ['serviceCategories', user?.orgId],
+    queryFn: () => serviceCategoryApi.getActiveByOrg(user!.orgId),
+    enabled: !!user?.orgId
+  });
+
   // Reset form when dialog opens/closes
   useEffect(() => {
     if (serviceToEdit) {
       setFormData({
         name: serviceToEdit.name || '',
         description: serviceToEdit.description || '',
-        category: serviceToEdit.category || '',
+        categoryId: serviceToEdit.categoryId || '',
         defaultPrice: serviceToEdit.defaultPrice?.toString() || '',
         estimatedDurationMinutes: serviceToEdit.estimatedDurationMinutes?.toString() || ''
       });
     } else {
       setFormData({ 
-        name: '', description: '', category: '', defaultPrice: '', estimatedDurationMinutes: '' 
+        name: '', description: '', categoryId: '', defaultPrice: '', estimatedDurationMinutes: '' 
       });
     }
     setError('');
@@ -81,6 +86,7 @@ export const ServiceDialog = ({ open, onClose, onSuccess, serviceToEdit }: Servi
       if (serviceToEdit) {
         const payload: UpdateServiceRequest = { 
           ...formData,
+          categoryId: formData.categoryId === '' ? undefined : Number(formData.categoryId),
           defaultPrice: price,
           estimatedDurationMinutes: duration
         };
@@ -89,6 +95,7 @@ export const ServiceDialog = ({ open, onClose, onSuccess, serviceToEdit }: Servi
         const payload: CreateServiceRequest = {
           orgId: user.orgId,
           ...formData,
+          categoryId: formData.categoryId === '' ? undefined : Number(formData.categoryId),
           defaultPrice: price,
           estimatedDurationMinutes: duration
         };
@@ -174,13 +181,14 @@ export const ServiceDialog = ({ open, onClose, onSuccess, serviceToEdit }: Servi
             <TextField
               select
               label="Category"
-              name="category"
-              value={formData.category}
+              name="categoryId"
+              value={formData.categoryId}
               onChange={handleChange}
               fullWidth
             >
-              {CATEGORY_OPTIONS.map((cat) => (
-                <MenuItem key={cat} value={cat}>{cat}</MenuItem>
+              <MenuItem value=""><em>None</em></MenuItem>
+              {categories?.map((cat) => (
+                <MenuItem key={cat.categoryId} value={cat.categoryId}>{cat.name}</MenuItem>
               ))}
             </TextField>
 

@@ -7,7 +7,7 @@ import { LoginPage } from '../../features/auth/pages/LoginPage';
 
 import { CustomerList } from '../../features/customers/pages/CustomerList';
 
-import { ServiceList } from '../../features/services/pages/ServiceList';
+import { ServicesPage } from '../../features/services/pages/ServicesPage';
 import { StaffList } from '../../features/staff/pages/StaffList';
 import { AppointmentsCalendar } from '../../features/appointments/pages/AppointmentsCalendar';
 import { PaymentList } from '../../features/payments/pages/PaymentList';
@@ -32,7 +32,7 @@ export const AppRouter = () => {
 
           {/* Services & Staff Route - MANAGER and above */}
           <Route element={<ProtectedRoute minRole="MANAGER" />}>
-            <Route path="services" element={<ServiceList />} />
+            <Route path="services" element={<ServicesPage />} />
             <Route path="staff" element={<StaffList />} />
           </Route>
         </Route>

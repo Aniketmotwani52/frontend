@@ -38,7 +38,7 @@ interface AppointmentDrawerProps {
 
 
 
-const DRAWER_WIDTH = 500; // Wide drawer for complex forms
+const DRAWER_WIDTH = 750; // Increased drawer width for table layout
 
 export const AppointmentDrawer = ({ open, mode, setMode, appointment, onClose, onSuccess, staffList, initialStartTime, initialStaffId, initialDate }: AppointmentDrawerProps) => {
   const { user } = useAuth();
