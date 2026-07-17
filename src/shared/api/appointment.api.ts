@@ -12,6 +12,11 @@ export const appointmentApi = {
     return response.data;
   },
 
+  getCustomerHistory: async (customerId: number): Promise<FullAppointment[]> => {
+    const response = await api.get(`/appointment-workflows/customer/${customerId}`);
+    return response.data;
+  },
+
   create: async (data: CreateAppointmentRequest): Promise<Appointment> => {
     const response = await api.post('/appointments', data);
     return response.data;

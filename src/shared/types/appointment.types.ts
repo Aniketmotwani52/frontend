@@ -33,9 +33,13 @@ export interface CreateAppointmentRequest {
 }
 
 export interface CreateAppointmentServiceItemRequest {
-  appointmentId: number;
+  appointmentServiceItemId?: number;
   serviceId: number;
   notes?: string;
+  staffIds: number[];
+  redeemedFromPackageId?: number;
+  serviceStartTime?: string;
+  serviceEndTime?: string;
   serviceStatus?: string;
 }
 
@@ -70,6 +74,7 @@ export interface FullAppointmentServiceItem {
   serviceStartTime?: string;
   serviceEndTime?: string;
   notes?: string;
+  redeemedFromPackageId?: number;
   isActive: boolean;
   createdAt: string;
   updatedAt: string;

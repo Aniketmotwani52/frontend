@@ -2,8 +2,9 @@ import React, { useState } from 'react';
 import { 
   Box, Typography, Button, Paper, Table, TableBody, 
   TableCell, TableContainer, TableHead, TableRow, IconButton, 
-  CircularProgress, Chip 
+  CircularProgress, Chip, Tabs, Tab, TextField, InputAdornment, FormControl, Select, MenuItem
 } from '@mui/material';
+import SearchIcon from '@mui/icons-material/Search';
 import AddIcon from '@mui/icons-material/Add';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
@@ -12,13 +13,18 @@ import { userApi } from '../../../shared/api/user.api';
 import { useAuth } from '../../../app/providers/AuthContext';
 import type { User } from '../../../shared/types/user.types';
 import { StaffDialog } from '../components/StaffDialog';
+import { StaffLedger } from '../components/StaffLedger';
 
 export const StaffList = () => {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   
+  const [tabValue, setTabValue] = useState(0);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [staffToEdit, setStaffToEdit] = useState<User | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [roleFilter, setRoleFilter] = useState<string>('ALL');
+  const [statusFilter, setStatusFilter] = useState<string>('ALL');
 
   // Fetch all users for the org
   const { data: allUsers, isLoading, isError } = useQuery({
@@ -29,6 +35,8 @@ export const StaffList = () => {
 
   // Filter out ADMIN role so they don't show in the Salon Staff list
   const staffMembers = allUsers?.filter(u => u.role !== 'ADMIN') || [];
+  
+  const uniqueRoles = Array.from(new Set(staffMembers.map(u => u.role)));
 
   const handleAddClick = () => {
     setStaffToEdit(null);
@@ -78,21 +86,75 @@ export const StaffList = () => {
 
   return (
     <Box>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 4 }}>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
         <Typography variant="h4" sx={{ fontWeight: 700, color: 'var(--text-primary)' }}>
           Staff Management
         </Typography>
-        <Button 
-          variant="contained" 
-          startIcon={<AddIcon />}
-          onClick={handleAddClick}
-          sx={{ borderRadius: '24px', px: 3 }}
-        >
-          Add Staff Member
-        </Button>
+        {tabValue === 0 && (
+          <Box sx={{ display: 'flex', gap: 2 }}>
+            <TextField
+              size="small"
+              placeholder="Search staff..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              slotProps={{
+                input: {
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <SearchIcon color="action" fontSize="small" />
+                    </InputAdornment>
+                  ),
+                }
+              }}
+              sx={{ width: 250, background: 'var(--bg-paper)', borderRadius: 1 }}
+            />
+            <FormControl size="small" sx={{ minWidth: 120 }}>
+              <Select
+                value={roleFilter}
+                onChange={(e) => setRoleFilter(e.target.value as string)}
+                displayEmpty
+                sx={{ background: 'var(--bg-paper)' }}
+              >
+                <MenuItem value="ALL">All Roles</MenuItem>
+                {uniqueRoles.map(role => (
+                  <MenuItem key={role} value={role}>{role}</MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+            <FormControl size="small" sx={{ minWidth: 120 }}>
+              <Select
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value as string)}
+                displayEmpty
+                sx={{ background: 'var(--bg-paper)' }}
+              >
+                <MenuItem value="ALL">All Status</MenuItem>
+                <MenuItem value="ACTIVE">Active</MenuItem>
+                <MenuItem value="INACTIVE">Inactive</MenuItem>
+                <MenuItem value="ON_LEAVE">On Leave</MenuItem>
+              </Select>
+            </FormControl>
+            <Button 
+              variant="contained" 
+              startIcon={<AddIcon />}
+              onClick={handleAddClick}
+              sx={{ borderRadius: '24px', px: 3 }}
+            >
+              Add Staff Member
+            </Button>
+          </Box>
+        )}
       </Box>
 
-      <TableContainer component={Paper} className="glass-panel" sx={{ boxShadow: 'none' }}>
+      <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 4 }}>
+        <Tabs value={tabValue} onChange={(e, v) => setTabValue(v)}>
+          <Tab label="Staff Directory" />
+          <Tab label="Performance Ledger" />
+        </Tabs>
+      </Box>
+
+      {tabValue === 0 && (
+        <TableContainer component={Paper} className="glass-panel" sx={{ boxShadow: 'none' }}>
         <Table sx={{ minWidth: 650 }}>
           <TableHead>
             <TableRow>
@@ -113,7 +175,27 @@ export const StaffList = () => {
                 </TableCell>
               </TableRow>
             ) : (
-              staffMembers.map((staff) => (
+              staffMembers.filter(s => {
+                let matchesSearch = true;
+                let matchesRole = true;
+                let matchesStatus = true;
+                
+                if (searchQuery) {
+                  const q = searchQuery.toLowerCase();
+                  matchesSearch = s.userName?.toLowerCase().includes(q) || 
+                                 (s.email && s.email.toLowerCase().includes(q)) || false;
+                }
+                
+                if (roleFilter !== 'ALL') {
+                  matchesRole = s.role === roleFilter;
+                }
+                
+                if (statusFilter !== 'ALL') {
+                  matchesStatus = s.status === statusFilter;
+                }
+                
+                return matchesSearch && matchesRole && matchesStatus;
+              }).map((staff) => (
                 <TableRow key={staff.userId} sx={{ '&:last-child td, &:last-child th': { border: 0 } }}>
                   <TableCell component="th" scope="row">
                     <Typography sx={{ fontWeight: 500 }}>{staff.userName}</Typography>
@@ -167,6 +249,11 @@ export const StaffList = () => {
           </TableBody>
         </Table>
       </TableContainer>
+      )}
+
+      {tabValue === 1 && (
+        <StaffLedger />
+      )}
 
       <StaffDialog 
         open={dialogOpen} 

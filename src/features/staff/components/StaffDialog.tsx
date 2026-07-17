@@ -144,8 +144,6 @@ export const StaffDialog = ({ open, onClose, onSuccess, staffToEdit }: StaffDial
           boxShadow: 'var(--shadow-lg)'
         }
       }}
-      maxWidth="md"
-      fullWidth
     >
       <DialogTitle sx={{ fontWeight: 700, color: 'var(--primary-main)' }}>
         {staffToEdit ? 'Edit Staff Member' : 'Add New Staff Member'}

@@ -14,6 +14,8 @@ export const KpiCard: React.FC<KpiCardProps> = ({ title, value, icon, subtitle, 
     <Paper
       elevation={0}
       sx={{
+        height: '100%',
+        boxSizing: 'border-box',
         p: 3,
         display: 'flex',
         alignItems: 'center',

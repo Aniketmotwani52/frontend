@@ -2,8 +2,9 @@ import React, { useState } from 'react';
 import {
   Box, Typography, Button, Paper, Table, TableBody,
   TableCell, TableContainer, TableHead, TableRow, IconButton,
-  CircularProgress, Chip
+  CircularProgress, Chip, TextField, InputAdornment, FormControl, Select, MenuItem
 } from '@mui/material';
+import SearchIcon from '@mui/icons-material/Search';
 import AddIcon from '@mui/icons-material/Add';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
@@ -19,6 +20,9 @@ export const ServiceList = () => {
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [serviceToEdit, setServiceToEdit] = useState<Service | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [categoryFilter, setCategoryFilter] = useState<string>('ALL');
+  const [statusFilter, setStatusFilter] = useState<string>('ALL');
 
   // Fetch all services for the org
   const { data: services, isLoading, isError } = useQuery({
@@ -26,6 +30,8 @@ export const ServiceList = () => {
     queryFn: () => serviceApi.getAllByOrg(user!.orgId),
     enabled: !!user?.orgId
   });
+
+  const uniqueCategories = Array.from(new Set(services?.filter(s => s.categoryName).map(s => s.categoryName) || []));
 
   const handleAddClick = () => {
     setServiceToEdit(null);
@@ -72,14 +78,57 @@ export const ServiceList = () => {
         <Typography variant="h4" sx={{ fontWeight: 700, color: 'var(--text-primary)' }}>
           Services Menu
         </Typography>
-        <Button
-          variant="contained"
-          startIcon={<AddIcon />}
-          onClick={handleAddClick}
-          sx={{ borderRadius: '24px', px: 3 }}
-        >
-          Add Service
-        </Button>
+        <Box sx={{ display: 'flex', gap: 2 }}>
+          <TextField
+            size="small"
+            placeholder="Search services..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            slotProps={{
+              input: {
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <SearchIcon color="action" fontSize="small" />
+                  </InputAdornment>
+                ),
+              }
+            }}
+            sx={{ width: 250, background: 'var(--bg-paper)', borderRadius: 1 }}
+          />
+          <FormControl size="small" sx={{ minWidth: 150 }}>
+            <Select
+              value={categoryFilter}
+              onChange={(e) => setCategoryFilter(e.target.value as string)}
+              displayEmpty
+              sx={{ background: 'var(--bg-paper)' }}
+            >
+              <MenuItem value="ALL">All Categories</MenuItem>
+              {uniqueCategories.map(cat => (
+                <MenuItem key={cat} value={cat}>{cat}</MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+          <FormControl size="small" sx={{ minWidth: 120 }}>
+            <Select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value as string)}
+              displayEmpty
+              sx={{ background: 'var(--bg-paper)' }}
+            >
+              <MenuItem value="ALL">All Status</MenuItem>
+              <MenuItem value="ACTIVE">Active</MenuItem>
+              <MenuItem value="INACTIVE">Inactive</MenuItem>
+            </Select>
+          </FormControl>
+          <Button
+            variant="contained"
+            startIcon={<AddIcon />}
+            onClick={handleAddClick}
+            sx={{ borderRadius: '24px', px: 3 }}
+          >
+            Add Service
+          </Button>
+        </Box>
       </Box>
 
       <TableContainer component={Paper} className="glass-panel" sx={{ boxShadow: 'none' }}>
@@ -98,11 +147,31 @@ export const ServiceList = () => {
             {services?.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={6} align="center" sx={{ py: 4, color: 'var(--text-secondary)' }}>
-                  No services found. Click 'Add Service' to create your menu!
+                  No services found.
                 </TableCell>
               </TableRow>
             ) : (
-              services?.map((service) => (
+              services?.filter(s => {
+                let matchesSearch = true;
+                let matchesCategory = true;
+                let matchesStatus = true;
+                
+                if (searchQuery) {
+                  const q = searchQuery.toLowerCase();
+                  matchesSearch = s.name.toLowerCase().includes(q) || 
+                                 (s.categoryName && s.categoryName.toLowerCase().includes(q)) || false;
+                }
+                
+                if (categoryFilter !== 'ALL') {
+                  matchesCategory = s.categoryName === categoryFilter;
+                }
+                
+                if (statusFilter !== 'ALL') {
+                  matchesStatus = statusFilter === 'ACTIVE' ? s.isActive : !s.isActive;
+                }
+                
+                return matchesSearch && matchesCategory && matchesStatus;
+              }).map((service) => (
                 <TableRow key={service.serviceId} sx={{ '&:last-child td, &:last-child th': { border: 0 } }}>
                   <TableCell component="th" scope="row">
                     <Typography sx={{ fontWeight: 500 }}>{service.name}</Typography>

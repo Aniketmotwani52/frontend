@@ -1,9 +1,11 @@
 import React from 'react';
-import { Box, Typography, Button, TextField, Autocomplete, Divider, IconButton, CircularProgress, Alert, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper } from '@mui/material';
+import { Box, Typography, Button, TextField, Autocomplete, Divider, IconButton, CircularProgress, Alert, Chip, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper } from '@mui/material';
 import DeleteIcon from '@mui/icons-material/Delete';
 import AddIcon from '@mui/icons-material/Add';
 import MenuItem from '@mui/material/MenuItem';
 import { useRoleAccess } from '../../../../shared/hooks/useRoleAccess';
+import { useQuery } from '@tanstack/react-query';
+import { packageApi } from '../../../packages/api/package.api';
 import type { Customer } from '../../../../shared/types/customer.types';
 import type { User } from '../../../../shared/types/user.types';
 import type { Service } from '../../../../shared/types/service.types';
@@ -13,6 +15,10 @@ export interface ServiceSelection {
   serviceId: number | '';
   notes: string;
   assignedStaffIds: number[];
+  redeemedFromPackageId?: number;
+  startTime: string;
+  endTime: string;
+  serviceStatus?: string;
 }
 
 interface AppointmentFormModeProps {
@@ -50,14 +56,29 @@ export const AppointmentFormMode: React.FC<AppointmentFormModeProps> = ({
 }) => {
   const { hasMinRole } = useRoleAccess();
 
+  const customerIdNumber = formData.customerId ? Number(formData.customerId) : null;
+  const { data: customerPackages = [] } = useQuery({
+    queryKey: ['customerPackages', customerIdNumber],
+    queryFn: () => packageApi.getCustomerPackages(customerIdNumber!),
+    enabled: !!customerIdNumber,
+  });
+
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
   const handleAddService = () => {
+    let defaultStartTime = formData.startTime || '12:00';
+    if (selectedServices.length > 0) {
+      const lastService = selectedServices[selectedServices.length - 1];
+      if (lastService.endTime) {
+        defaultStartTime = lastService.endTime;
+      }
+    }
+
     setSelectedServices([
       ...selectedServices,
-      { id: Date.now().toString(), serviceId: '', notes: '', assignedStaffIds: [] }
+      { id: Date.now().toString(), serviceId: '', notes: '', assignedStaffIds: [], startTime: defaultStartTime, endTime: defaultStartTime }
     ]);
   };
 
@@ -66,7 +87,28 @@ export const AppointmentFormMode: React.FC<AppointmentFormModeProps> = ({
   };
 
   const handleServiceChange = (id: string, field: keyof ServiceSelection, value: any) => {
-    setSelectedServices(selectedServices.map(s => s.id === id ? { ...s, [field]: value } : s));
+    setSelectedServices(selectedServices.map(s => {
+      if (s.id !== id) return s;
+      
+      const updated = { ...s, [field]: value };
+      
+      // Auto-calculate endTime based on duration when service or startTime changes
+      if (field === 'serviceId' || field === 'startTime') {
+        const serviceIdToUse = field === 'serviceId' ? value : s.serviceId;
+        const startTimeToUse = field === 'startTime' ? value : s.startTime;
+        const serviceObj = services.find(srv => srv.serviceId === serviceIdToUse);
+        
+        if (serviceObj && startTimeToUse) {
+          const duration = serviceObj.estimatedDurationMinutes || 30;
+          const [hours, mins] = startTimeToUse.split(':').map(Number);
+          const totalMins = hours * 60 + mins + duration;
+          const newHours = Math.floor(totalMins / 60) % 24;
+          const newMins = totalMins % 60;
+          updated.endTime = `${newHours.toString().padStart(2, '0')}:${newMins.toString().padStart(2, '0')}`;
+        }
+      }
+      return updated;
+    }));
   };
 
   const sortedServices = React.useMemo(() => {
@@ -104,23 +146,23 @@ export const AppointmentFormMode: React.FC<AppointmentFormModeProps> = ({
 
         <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2 }}>
           <TextField label="Date" name="appointmentDate" type="date" value={formData.appointmentDate} onChange={handleChange} required fullWidth />
-          <TextField
-            select
-            label="Status"
-            name="appointmentStatus"
-            value={formData.appointmentStatus}
-            onChange={handleChange}
-            fullWidth
-            disabled={mode === 'CREATE'}
-          >
-            <MenuItem value="SCHEDULED">Scheduled</MenuItem>
-            <MenuItem value="IN_PROGRESS">In Progress</MenuItem>
-            <MenuItem value="COMPLETED">Completed</MenuItem>
-            <MenuItem value="NO_SHOW">No Show</MenuItem>
-            <MenuItem value="CANCELLED">Cancelled</MenuItem>
-          </TextField>
-          <TextField label="Start Time" name="startTime" type="time" value={formData.startTime} onChange={handleChange} required fullWidth />
-          <TextField label="End Time" name="endTime" type="time" value={formData.endTime} onChange={handleChange} required fullWidth />
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+            <Typography variant="caption" color="text.secondary">Global Status (Auto-calculated)</Typography>
+            <Box sx={{ display: 'flex', alignItems: 'center', height: '40px' }}>
+              <Chip 
+                label={formData.appointmentStatus} 
+                size="small" 
+                color={
+                  formData.appointmentStatus === 'COMPLETED' ? 'primary' :
+                  formData.appointmentStatus === 'IN_PROGRESS' ? 'secondary' :
+                  formData.appointmentStatus === 'SCHEDULED' ? 'info' :
+                  formData.appointmentStatus === 'NO_SHOW' ? 'error' :
+                  'default'
+                }
+                sx={{ fontWeight: 600 }} 
+              />
+            </Box>
+          </Box>
         </Box>
 
         <TextField label="Notes" name="notes" value={formData.notes} onChange={handleChange} multiline rows={2} fullWidth />
@@ -143,10 +185,16 @@ export const AppointmentFormMode: React.FC<AppointmentFormModeProps> = ({
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
           {selectedServices.map((svc, index) => {
             const selectedSvcObj = services.find(s => s.serviceId === svc.serviceId);
+            
+            const applicablePackages = customerPackages.filter(pkg => 
+              pkg.status !== 'CANCELLED' && 
+              pkg.balances.some(bal => bal.serviceId === svc.serviceId && bal.totalQuantity > bal.usedQuantity)
+            );
+            
             return (
               <Box key={svc.id} sx={{ p: 2, border: '1px solid var(--border-color)', borderRadius: '12px', background: 'rgba(255,255,255,0.02)' }}>
-                {/* Top Row: Service, Staff, Duration, Price, Delete */}
-                <Box sx={{ display: 'grid', gridTemplateColumns: '2fr 2fr auto auto auto', gap: 2, alignItems: 'center' }}>
+                {/* Top Row: Service, Staff */}
+                <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2, alignItems: 'start' }}>
                   <Autocomplete
                     options={sortedServices}
                     groupBy={(option) => option.categoryName || 'Uncategorized'}
@@ -176,6 +224,39 @@ export const AppointmentFormMode: React.FC<AppointmentFormModeProps> = ({
                       <TextField {...params} required={svc.assignedStaffIds.length === 0} size="small" placeholder="Select Staff" label="Assigned Staff" />
                     )}
                   />
+                </Box>
+
+                {/* Middle Row: Times, Status, Duration, Price, Delete */}
+                <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr auto auto auto', gap: 2, alignItems: 'center', mt: 2 }}>
+                  <TextField 
+                    label="Start Time" 
+                    type="time" 
+                    value={svc.startTime || ''} 
+                    onChange={(e) => handleServiceChange(svc.id, 'startTime', e.target.value)} 
+                    required 
+                    size="small" 
+                  />
+                  <TextField 
+                    label="End Time" 
+                    type="time" 
+                    value={svc.endTime || ''} 
+                    onChange={(e) => handleServiceChange(svc.id, 'endTime', e.target.value)} 
+                    required 
+                    size="small" 
+                  />
+
+                  <TextField
+                    select
+                    label="Status"
+                    size="small"
+                    value={svc.serviceStatus || 'PENDING'}
+                    onChange={(e) => handleServiceChange(svc.id, 'serviceStatus', e.target.value)}
+                  >
+                    <MenuItem value="PENDING">Pending</MenuItem>
+                    <MenuItem value="IN_PROGRESS">In Progress</MenuItem>
+                    <MenuItem value="COMPLETED">Completed</MenuItem>
+                    <MenuItem value="CANCELLED">Cancelled</MenuItem>
+                  </TextField>
 
                   <Box sx={{ minWidth: '60px', textAlign: 'center' }}>
                     <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>Duration</Typography>
@@ -186,8 +267,8 @@ export const AppointmentFormMode: React.FC<AppointmentFormModeProps> = ({
 
                   <Box sx={{ minWidth: '60px', textAlign: 'center' }}>
                     <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>Price</Typography>
-                    <Typography variant="body2" sx={{ fontWeight: 600, color: 'var(--text-primary)' }}>
-                      {selectedSvcObj ? `₹${selectedSvcObj.defaultPrice}` : '-'}
+                    <Typography variant="body2" sx={{ fontWeight: 600, color: svc.redeemedFromPackageId ? 'success.main' : 'var(--text-primary)' }}>
+                      {svc.redeemedFromPackageId ? '₹0 (Package)' : (selectedSvcObj ? `₹${selectedSvcObj.defaultPrice}` : '-')}
                     </Typography>
                   </Box>
 
@@ -196,8 +277,8 @@ export const AppointmentFormMode: React.FC<AppointmentFormModeProps> = ({
                   </IconButton>
                 </Box>
 
-                {/* Bottom Row: Notes */}
-                <Box sx={{ mt: 2 }}>
+                {/* Bottom Row: Notes and Packages */}
+                <Box sx={{ mt: 2, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2 }}>
                   <TextField
                     value={svc.notes}
                     onChange={(e) => handleServiceChange(svc.id, 'notes', e.target.value)}
@@ -205,6 +286,22 @@ export const AppointmentFormMode: React.FC<AppointmentFormModeProps> = ({
                     placeholder="Add any special notes or requests for this service..."
                     fullWidth
                   />
+                  {applicablePackages.length > 0 && (
+                    <TextField
+                      select
+                      size="small"
+                      label="Redeem from Package?"
+                      value={svc.redeemedFromPackageId || ''}
+                      onChange={(e) => handleServiceChange(svc.id, 'redeemedFromPackageId', e.target.value ? Number(e.target.value) : undefined)}
+                    >
+                      <MenuItem value="">Do not redeem</MenuItem>
+                      {applicablePackages.map(pkg => (
+                        <MenuItem key={pkg.customerPackageId} value={pkg.customerPackageId}>
+                          {pkg.name} (Available)
+                        </MenuItem>
+                      ))}
+                    </TextField>
+                  )}
                 </Box>
               </Box>
             )

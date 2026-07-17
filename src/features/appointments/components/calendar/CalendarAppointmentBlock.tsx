@@ -23,8 +23,26 @@ export const CalendarAppointmentBlock: React.FC<CalendarAppointmentBlockProps> =
 }) => {
   const { hasMinRole } = useRoleAccess();
 
-  const start = dayjs(app.appointmentStartTime);
-  const end = dayjs(app.appointmentEndTime);
+  const targetServices = app.serviceItems?.filter(item => item.assignedStaff?.some(assign => assign.staffUserId === staffUserId)) || [];
+  
+  // Find the earliest start and latest end among the services assigned to this staff
+  let blockStartTime = app.appointmentStartTime;
+  let blockEndTime = app.appointmentEndTime;
+
+  if (targetServices.length > 0) {
+    const validStarts = targetServices.map(s => s.serviceStartTime).filter(Boolean) as string[];
+    const validEnds = targetServices.map(s => s.serviceEndTime).filter(Boolean) as string[];
+    
+    if (validStarts.length > 0) {
+      blockStartTime = validStarts.sort()[0];
+    }
+    if (validEnds.length > 0) {
+      blockEndTime = validEnds.sort().reverse()[0];
+    }
+  }
+
+  const start = dayjs(blockStartTime);
+  const end = dayjs(blockEndTime);
   const durationMins = end.diff(start, 'minute');
   const startMins = start.hour() * 60 + start.minute() - (START_HOUR * 60);
 
@@ -43,6 +61,21 @@ export const CalendarAppointmentBlock: React.FC<CalendarAppointmentBlockProps> =
   ];
 
   const staffColor = STAFF_COLORS[staffUserId % STAFF_COLORS.length];
+
+  let blockStatus: string = app.appointmentStatus;
+  if (targetServices.length === 1) {
+    blockStatus = targetServices[0].serviceStatus;
+  } else if (targetServices.length > 1) {
+    if (targetServices.every(s => s.serviceStatus === 'COMPLETED')) {
+      blockStatus = 'COMPLETED';
+    } else if (targetServices.some(s => s.serviceStatus === 'IN_PROGRESS' || s.serviceStatus === 'COMPLETED')) {
+      blockStatus = 'IN_PROGRESS';
+    } else if (targetServices.every(s => s.serviceStatus === 'CANCELLED')) {
+      blockStatus = 'CANCELLED';
+    } else {
+      blockStatus = 'PENDING';
+    }
+  }
 
   return (
     <Box
@@ -81,13 +114,13 @@ export const CalendarAppointmentBlock: React.FC<CalendarAppointmentBlockProps> =
 
       <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap', mt: 'auto' }}>
         <Chip 
-          label={app.appointmentStatus} 
+          label={blockStatus} 
           size="small" 
           color={
-            app.appointmentStatus === 'COMPLETED' ? 'primary' :
-            app.appointmentStatus === 'IN_PROGRESS' ? 'secondary' :
-            app.appointmentStatus === 'SCHEDULED' ? 'info' :
-            app.appointmentStatus === 'NO_SHOW' ? 'error' :
+            blockStatus === 'COMPLETED' ? 'primary' :
+            blockStatus === 'IN_PROGRESS' ? 'secondary' :
+            (blockStatus === 'SCHEDULED' || blockStatus === 'PENDING') ? 'info' :
+            (blockStatus === 'NO_SHOW' || blockStatus === 'CANCELLED') ? 'error' :
             'default'
           }
           sx={{ height: 18, fontSize: '0.65rem', fontWeight: 600 }} 

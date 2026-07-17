@@ -44,6 +44,7 @@ export const AppointmentDrawer = ({ open, mode, setMode, appointment, onClose, o
   const { user } = useAuth();
   const { hasMinRole } = useRoleAccess();
   const [isLoading, setIsLoading] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
   const [error, setError] = useState('');
 
   const [customers, setCustomers] = useState<Customer[]>([]);
@@ -102,6 +103,62 @@ export const AppointmentDrawer = ({ open, mode, setMode, appointment, onClose, o
     }
   };
 
+  const handleServiceQuickStatusUpdate = async (serviceItemId: number, status: string) => {
+    if (!appointment) return;
+    try {
+      setIsLoading(true);
+      
+      // Map the current appointment to a full update payload, but ONLY change this one service's status
+      const payload = {
+        customerId: Number(appointment.customerId),
+        appointmentStartTime: appointment.appointmentStartTime,
+        appointmentEndTime: appointment.appointmentEndTime,
+        notes: appointment.notes || '',
+        appointmentStatus: appointment.appointmentStatus,
+        discountAmount: Number(appointment.discountAmount || 0),
+        services: appointment.serviceItems.map(svc => ({
+          appointmentServiceItemId: svc.appointmentServiceItemId,
+          serviceId: Number(svc.serviceId),
+          notes: svc.notes || '',
+          serviceStartTime: svc.serviceStartTime || appointment.appointmentStartTime,
+          serviceEndTime: svc.serviceEndTime || appointment.appointmentEndTime,
+          serviceStatus: svc.appointmentServiceItemId === serviceItemId ? status : (svc.serviceStatus || 'PENDING'),
+          staffIds: svc.assignedStaff.map(as => as.staffUserId),
+          redeemedFromPackageId: svc.redeemedFromPackageId || undefined
+        }))
+      };
+
+      await appointmentApi.updateFullWorkflow(appointment.appointmentId, payload);
+      onSuccess();
+    } catch (err: any) {
+      setError(err.message || 'Failed to update service status');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleDeleteAppointment = async () => {
+    if (!appointment) return;
+    
+    let confirmMsg = "Are you sure you want to delete this appointment? This action cannot be undone.";
+    if (appointment.paymentStatus === 'PAID' || appointment.paymentStatus === 'PARTIAL') {
+        confirmMsg = "Are you sure you want to delete this appointment?\n\nWARNING: This appointment has payments associated with it. Deleting it will automatically mark those payments as REFUNDED internally.";
+    }
+
+    if (!window.confirm(confirmMsg)) return;
+    
+    try {
+      setIsDeleting(true);
+      await appointmentApi.delete(appointment.appointmentId);
+      onSuccess();
+      onClose();
+    } catch (err: any) {
+      setError(err.message || 'Failed to delete appointment');
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
   useEffect(() => {
     if (open && user) {
       loadData();
@@ -121,7 +178,10 @@ export const AppointmentDrawer = ({ open, mode, setMode, appointment, onClose, o
             id: Date.now().toString(),
             serviceId: '',
             assignedStaffIds: [initialStaffId],
-            notes: ''
+            notes: '',
+            startTime: defaultStartTime,
+            endTime: dayjs(now.format('YYYY-MM-DD') + 'T' + defaultStartTime).add(1, 'hour').format('HH:mm'),
+            serviceStatus: 'PENDING'
           }];
         }
 
@@ -155,7 +215,10 @@ export const AppointmentDrawer = ({ open, mode, setMode, appointment, onClose, o
           id: si.appointmentServiceItemId.toString(),
           serviceId: si.serviceId,
           notes: si.notes || '',
-          assignedStaffIds: si.assignedStaff.map(as => as.staffUserId)
+          assignedStaffIds: si.assignedStaff.map(as => as.staffUserId),
+          startTime: si.serviceStartTime ? dayjs(si.serviceStartTime).format('HH:mm') : start.format('HH:mm'),
+          endTime: si.serviceEndTime ? dayjs(si.serviceEndTime).format('HH:mm') : end.format('HH:mm'),
+          serviceStatus: si.serviceStatus || 'PENDING'
         }));
         setSelectedServices(mappedServices);
       }
@@ -198,7 +261,8 @@ export const AppointmentDrawer = ({ open, mode, setMode, appointment, onClose, o
   const subtotal = React.useMemo(() => {
     return selectedServices.reduce((sum, svc) => {
       const service = services.find(s => s.serviceId === svc.serviceId);
-      return sum + (service?.defaultPrice || 0);
+      const price = svc.redeemedFromPackageId ? 0 : (service?.defaultPrice || 0);
+      return sum + price;
     }, 0);
   }, [selectedServices, services]);
 
@@ -215,7 +279,7 @@ export const AppointmentDrawer = ({ open, mode, setMode, appointment, onClose, o
   const handleAddService = () => {
     setSelectedServices([
       ...selectedServices,
-      { id: Date.now().toString(), serviceId: '', notes: '', assignedStaffIds: [] }
+      { id: Date.now().toString(), serviceId: '', notes: '', assignedStaffIds: [], startTime: '12:00', endTime: '12:00', serviceStatus: 'PENDING' }
     ]);
   };
 
@@ -266,7 +330,11 @@ export const AppointmentDrawer = ({ open, mode, setMode, appointment, onClose, o
           services: selectedServices.map(svc => ({
             serviceId: Number(svc.serviceId),
             notes: svc.notes,
-            staffIds: svc.assignedStaffIds
+            serviceStartTime: `${formData.appointmentDate}T${svc.startTime}:00`,
+            serviceEndTime: `${formData.appointmentDate}T${svc.endTime}:00`,
+            serviceStatus: svc.serviceStatus || 'PENDING',
+            staffIds: svc.assignedStaffIds,
+            redeemedFromPackageId: svc.redeemedFromPackageId || undefined
           }))
         };
         await appointmentApi.createFullWorkflow(payload);
@@ -279,12 +347,14 @@ export const AppointmentDrawer = ({ open, mode, setMode, appointment, onClose, o
           appointmentStatus: formData.appointmentStatus,
           discountAmount: Number(formData.discountAmount || 0),
           services: selectedServices.map(svc => ({
+            appointmentServiceItemId: svc.id && !svc.id.includes(Date.now().toString().substring(0, 5)) ? Number(svc.id) : undefined,
             serviceId: Number(svc.serviceId),
             notes: svc.notes,
-            serviceStatus: 'PENDING',
-            serviceStartTime: startDateTime,
-            serviceEndTime: endDateTime,
-            staffIds: svc.assignedStaffIds
+            serviceStartTime: `${formData.appointmentDate}T${svc.startTime}:00`,
+            serviceEndTime: `${formData.appointmentDate}T${svc.endTime}:00`,
+            serviceStatus: svc.serviceStatus || 'PENDING',
+            staffIds: svc.assignedStaffIds,
+            redeemedFromPackageId: svc.redeemedFromPackageId || undefined
           }))
         };
         await appointmentApi.updateFullWorkflow(appointment.appointmentId, payload);
@@ -330,6 +400,7 @@ export const AppointmentDrawer = ({ open, mode, setMode, appointment, onClose, o
           amountPaid={amountPaid}
           remainingBalance={remainingBalance}
           handleQuickStatusUpdate={handleQuickStatusUpdate}
+          handleServiceQuickStatusUpdate={handleServiceQuickStatusUpdate}
           setMode={setMode}
           setIsPaymentDialogOpen={setIsPaymentDialogOpen}
           handleUpdateTransactionStatus={handleUpdateTransactionStatus}
@@ -337,6 +408,9 @@ export const AppointmentDrawer = ({ open, mode, setMode, appointment, onClose, o
           setAnchorEl={setAnchorEl}
           selectedTransactionId={selectedTransactionId}
           setSelectedTransactionId={setSelectedTransactionId}
+          handleDeleteAppointment={handleDeleteAppointment}
+          isDeleting={isDeleting}
+          customers={customers}
         />
       ) : (
         <AppointmentFormMode

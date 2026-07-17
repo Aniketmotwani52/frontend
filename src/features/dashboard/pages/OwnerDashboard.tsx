@@ -34,8 +34,8 @@ export const OwnerDashboard: React.FC = () => {
     if (!user?.orgId) return;
     try {
       setLoading(true);
-      const from = fromDate ? fromDate.toISOString() : undefined;
-      const to = toDate ? toDate.toISOString() : undefined;
+      const from = fromDate ? fromDate.format('YYYY-MM-DDTHH:mm:ss') : undefined;
+      const to = toDate ? toDate.format('YYYY-MM-DDTHH:mm:ss') : undefined;
       if (hasMinRole('MANAGER')) {
         const response = await dashboardApi.getSummary(user.orgId, from, to);
         setData(response);
@@ -140,7 +140,7 @@ export const OwnerDashboard: React.FC = () => {
           <Grid container spacing={3}>
             {/* KPI Row */}
             {hasMinRole('MANAGER') && (
-              <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+              <Grid size={{ xs: 12, sm: 6, md: 4 }}>
                 <KpiCard 
                   title="Revenue" 
                   value={`₹${data.totalRevenue}`} 
@@ -149,7 +149,7 @@ export const OwnerDashboard: React.FC = () => {
                 />
               </Grid>
             )}
-            <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+            <Grid size={{ xs: 12, sm: 6, md: hasMinRole('MANAGER') ? 4 : 6 }}>
               <KpiCard 
                 title="Appointments" 
                 value={data.totalAppointments} 
@@ -158,17 +158,7 @@ export const OwnerDashboard: React.FC = () => {
                 color="#1976d2" 
               />
             </Grid>
-            {hasMinRole('MANAGER') && (
-              <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-                <KpiCard 
-                  title="Pending Payments" 
-                  value={`₹${data.pendingPaymentsAmount}`} 
-                  icon={<AccountBalanceWalletIcon fontSize="large" />} 
-                  color="#f44336" 
-                />
-              </Grid>
-            )}
-            <Grid size={{ xs: 12, sm: 6, md: hasMinRole('MANAGER') ? 3 : 6 }}>
+            <Grid size={{ xs: 12, sm: 6, md: hasMinRole('MANAGER') ? 4 : 6 }}>
               <KpiCard 
                 title="Upcoming" 
                 value={data.upcomingAppointments.length} 

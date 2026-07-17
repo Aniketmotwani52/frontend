@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Box, Typography, Tabs, Tab } from '@mui/material';
 import { ServiceList } from './ServiceList';
 import { ServiceCategoryList } from './ServiceCategoryList';
+import { PackagesList } from '../../packages/pages/PackagesList';
 
 interface TabPanelProps {
   children?: React.ReactNode;
@@ -42,6 +43,7 @@ export const ServicesPage = () => {
         <Tabs value={value} onChange={handleChange} aria-label="Services tabs">
           <Tab label="Services" sx={{ fontWeight: 600 }} />
           <Tab label="Categories" sx={{ fontWeight: 600 }} />
+          <Tab label="Packages" sx={{ fontWeight: 600 }} />
         </Tabs>
       </Box>
       <CustomTabPanel value={value} index={0}>
@@ -49,6 +51,9 @@ export const ServicesPage = () => {
       </CustomTabPanel>
       <CustomTabPanel value={value} index={1}>
         <ServiceCategoryList />
+      </CustomTabPanel>
+      <CustomTabPanel value={value} index={2}>
+        <PackagesList orgId={1} />
       </CustomTabPanel>
     </Box>
   );

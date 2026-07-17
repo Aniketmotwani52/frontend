@@ -2,8 +2,9 @@ import React, { useState } from 'react';
 import {
   Box, Typography, Button, Paper, Table, TableBody,
   TableCell, TableContainer, TableHead, TableRow, IconButton,
-  CircularProgress, Chip
+  CircularProgress, Chip, TextField, InputAdornment
 } from '@mui/material';
+import SearchIcon from '@mui/icons-material/Search';
 import AddIcon from '@mui/icons-material/Add';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
@@ -19,6 +20,7 @@ export const ServiceCategoryList = () => {
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [categoryToEdit, setCategoryToEdit] = useState<ServiceCategory | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
 
   // Fetch all categories for the org
   const { data: categories, isLoading, isError } = useQuery({
@@ -71,14 +73,32 @@ export const ServiceCategoryList = () => {
         <Typography variant="h5" sx={{ fontWeight: 600, color: 'var(--text-primary)' }}>
           Manage Categories
         </Typography>
-        <Button
-          variant="contained"
-          startIcon={<AddIcon />}
-          onClick={handleAddClick}
-          sx={{ borderRadius: '24px', px: 3 }}
-        >
-          Add Category
-        </Button>
+        <Box sx={{ display: 'flex', gap: 2 }}>
+          <TextField
+            size="small"
+            placeholder="Search categories..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            slotProps={{
+              input: {
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <SearchIcon color="action" fontSize="small" />
+                  </InputAdornment>
+                ),
+              }
+            }}
+            sx={{ width: 250, background: 'var(--bg-paper)', borderRadius: 1 }}
+          />
+          <Button
+            variant="contained"
+            startIcon={<AddIcon />}
+            onClick={handleAddClick}
+            sx={{ borderRadius: '24px', px: 3 }}
+          >
+            Add Category
+          </Button>
+        </Box>
       </Box>
 
       <TableContainer component={Paper} className="glass-panel" sx={{ boxShadow: 'none' }}>
@@ -98,7 +118,12 @@ export const ServiceCategoryList = () => {
                 </TableCell>
               </TableRow>
             ) : (
-              categories?.map((category) => (
+              categories?.filter(c => {
+                if (!searchQuery) return true;
+                const q = searchQuery.toLowerCase();
+                return c.name.toLowerCase().includes(q) || 
+                       (c.description && c.description.toLowerCase().includes(q));
+              }).map((category) => (
                 <TableRow key={category.categoryId} sx={{ '&:last-child td, &:last-child th': { border: 0 } }}>
                   <TableCell component="th" scope="row">
                     <Typography sx={{ fontWeight: 500 }}>{category.name}</Typography>

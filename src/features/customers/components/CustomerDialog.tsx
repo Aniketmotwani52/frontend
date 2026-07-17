@@ -109,8 +109,6 @@ export const CustomerDialog = ({ open, onClose, onSuccess, customerToEdit }: Cus
           boxShadow: 'var(--shadow-lg)'
         }
       }}
-      maxWidth="md"
-      fullWidth
     >
       <DialogTitle sx={{ fontWeight: 700, color: 'var(--primary-main)' }}>
         {customerToEdit ? 'Edit Customer' : 'Add New Customer'}

@@ -2,8 +2,9 @@ import React, { useState } from 'react';
 import { 
   Box, Typography, Button, Paper, Table, TableBody, 
   TableCell, TableContainer, TableHead, TableRow, IconButton, 
-  CircularProgress, Chip 
+  CircularProgress, Chip, TextField, InputAdornment 
 } from '@mui/material';
+import SearchIcon from '@mui/icons-material/Search';
 import AddIcon from '@mui/icons-material/Add';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
@@ -12,6 +13,10 @@ import { customerApi } from '../../../shared/api/customer.api';
 import { useAuth } from '../../../app/providers/AuthContext';
 import type { Customer } from '../../../shared/types/customer.types';
 import { CustomerDialog } from '../components/CustomerDialog';
+import { CustomerPackagesDialog } from '../components/CustomerPackagesDialog';
+import { CustomerProfileDrawer } from '../components/CustomerProfileDrawer';
+import LocalMallIcon from '@mui/icons-material/LocalMall';
+import VisibilityIcon from '@mui/icons-material/Visibility';
 
 export const CustomerList = () => {
   const { user } = useAuth();
@@ -19,6 +24,11 @@ export const CustomerList = () => {
   
   const [customerDialogOpen, setCustomerDialogOpen] = useState(false);
   const [customerToEdit, setCustomerToEdit] = useState<Customer | null>(null);
+
+  const [profileDrawerOpen, setProfileDrawerOpen] = useState(false);
+  const [packagesDialogOpen, setPackagesDialogOpen] = useState(false);
+  const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
 
   // Fetch all customers for the org
   const { data: customers, isLoading, isError } = useQuery({
@@ -35,6 +45,16 @@ export const CustomerList = () => {
   const handleEditClick = (customer: Customer) => {
     setCustomerToEdit(customer);
     setCustomerDialogOpen(true);
+  };
+
+  const handleProfileClick = (customer: Customer) => {
+    setSelectedCustomer(customer);
+    setProfileDrawerOpen(true);
+  };
+
+  const handlePackagesClick = (customer: Customer) => {
+    setSelectedCustomer(customer);
+    setPackagesDialogOpen(true);
   };
 
   const handleDeleteClick = async (customerId: number) => {
@@ -72,14 +92,32 @@ export const CustomerList = () => {
         <Typography variant="h4" sx={{ fontWeight: 700, color: 'var(--text-primary)' }}>
           Customers
         </Typography>
-        <Button 
-          variant="contained" 
-          startIcon={<AddIcon />}
-          onClick={handleAddClick}
-          sx={{ borderRadius: '24px', px: 3 }}
-        >
-          Add Customer
-        </Button>
+        <Box sx={{ display: 'flex', gap: 2 }}>
+          <TextField
+            size="small"
+            placeholder="Search customers..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            slotProps={{
+              input: {
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <SearchIcon color="action" fontSize="small" />
+                  </InputAdornment>
+                ),
+              }
+            }}
+            sx={{ width: 250, background: 'var(--bg-paper)', borderRadius: 1 }}
+          />
+          <Button 
+            variant="contained" 
+            startIcon={<AddIcon />}
+            onClick={handleAddClick}
+            sx={{ borderRadius: '24px', px: 3 }}
+          >
+            Add Customer
+          </Button>
+        </Box>
       </Box>
 
       <TableContainer component={Paper} className="glass-panel" sx={{ boxShadow: 'none' }}>
@@ -97,11 +135,17 @@ export const CustomerList = () => {
             {customers?.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={5} align="center" sx={{ py: 4, color: 'var(--text-secondary)' }}>
-                  No customers found. Click 'Add Customer' to get started!
+                  No customers found.
                 </TableCell>
               </TableRow>
             ) : (
-              customers?.map((customer) => (
+              customers?.filter(c => {
+                if (!searchQuery) return true;
+                const q = searchQuery.toLowerCase();
+                return c.customerName.toLowerCase().includes(q) || 
+                       (c.phoneNumber && c.phoneNumber.includes(q)) || 
+                       (c.email && c.email.toLowerCase().includes(q));
+              }).map((customer) => (
                 <TableRow key={customer.customerId} sx={{ '&:last-child td, &:last-child th': { border: 0 } }}>
                   <TableCell component="th" scope="row">
                     <Typography sx={{ fontWeight: 500 }}>{customer.customerName}</Typography>
@@ -117,6 +161,12 @@ export const CustomerList = () => {
                     />
                   </TableCell>
                   <TableCell align="right">
+                    <IconButton color="info" onClick={() => handleProfileClick(customer)} title="View Profile">
+                      <VisibilityIcon fontSize="small" />
+                    </IconButton>
+                    <IconButton color="secondary" onClick={() => handlePackagesClick(customer)} title="View Packages">
+                      <LocalMallIcon fontSize="small" />
+                    </IconButton>
                     <IconButton color="primary" onClick={() => handleEditClick(customer)}>
                       <EditIcon fontSize="small" />
                     </IconButton>
@@ -136,6 +186,20 @@ export const CustomerList = () => {
         onClose={() => setCustomerDialogOpen(false)} 
         onSuccess={handleDialogSuccess}
         customerToEdit={customerToEdit}
+      />
+
+      <CustomerPackagesDialog
+        open={packagesDialogOpen}
+        onClose={() => setPackagesDialogOpen(false)}
+        customerId={selectedCustomer?.customerId || null}
+        customerName={selectedCustomer?.customerName || ''}
+        orgId={user?.orgId || 0}
+      />
+
+      <CustomerProfileDrawer
+        open={profileDrawerOpen}
+        onClose={() => setProfileDrawerOpen(false)}
+        customer={selectedCustomer}
       />
     </Box>
   );

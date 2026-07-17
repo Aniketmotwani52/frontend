@@ -3,7 +3,10 @@ export type TransactionStatus = 'SUCCESS' | 'FAILED' | 'REFUNDED';
 
 export interface PaymentTransaction {
   transactionId: number;
-  appointmentId: number;
+  appointmentId?: number;
+  customerPackageId?: number;
+  customerPackageName?: string;
+  customerName?: string;
   amount: number;
   paymentMode: PaymentMode;
   transactionStatus: TransactionStatus;
@@ -19,4 +22,16 @@ export interface CreatePaymentRequest {
   paymentMode: PaymentMode;
   transactionReference?: string;
   notes?: string;
+}
+
+export interface PendingDue {
+  sourceId: number;
+  sourceType: 'APPOINTMENT' | 'PACKAGE';
+  sourceName: string;
+  customerId: number;
+  customerName: string;
+  date: string;
+  finalAmount: number;
+  amountPaid: number;
+  remainingBalance: number;
 }

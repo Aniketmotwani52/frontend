@@ -2,7 +2,7 @@ import axios from 'axios';
 
 // Base Axios instance
 export const api = axios.create({
-  baseURL: '/api/v1', // Adjust this if your backend is on a different domain, or use Vite proxy
+  baseURL: import.meta.env.VITE_API_URL || '/api/v1', // Uses absolute AWS URL in production, or relative Vite proxy locally
   headers: {
     'Content-Type': 'application/json',
   },

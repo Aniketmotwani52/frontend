@@ -1,6 +1,7 @@
 import React from 'react';
-import { Box, Typography, Paper, List, ListItem, ListItemText, ListItemAvatar, Avatar } from '@mui/material';
+import { Box, Typography, Paper, List, ListItem, ListItemText, ListItemAvatar, Avatar, Tooltip, IconButton } from '@mui/material';
 import EmojiEventsIcon from '@mui/icons-material/EmojiEvents';
+import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 import type { StaffPerformanceDto } from '../../../shared/types/dashboard.types';
 
 interface StaffLeaderboardProps {
@@ -23,9 +24,16 @@ export const StaffLeaderboard: React.FC<StaffLeaderboardProps> = ({ staff }) => 
         flexDirection: 'column'
       }}
     >
-      <Typography variant="h6" sx={{ fontWeight: 700 }} color="text.primary" gutterBottom>
-        Staff Leaderboard
-      </Typography>
+      <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+        <Typography variant="h6" sx={{ fontWeight: 700 }} color="text.primary">
+          Staff Leaderboard
+        </Typography>
+        <Tooltip title="Value of services performed is split evenly among assigned staff. Only completed services are counted." arrow>
+          <IconButton size="small" sx={{ ml: 1, color: 'text.secondary' }}>
+            <InfoOutlinedIcon fontSize="small" />
+          </IconButton>
+        </Tooltip>
+      </Box>
       
       {staff.length === 0 ? (
         <Box sx={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -60,13 +68,15 @@ export const StaffLeaderboard: React.FC<StaffLeaderboardProps> = ({ staff }) => 
                 }
                 secondary={
                   <Typography variant="caption" color="text.secondary">
-                    {member.appointmentsCompleted} Appointments
+                    {member.appointmentsCompleted} Services
                   </Typography>
                 }
               />
-              <Typography variant="subtitle2" sx={{ fontWeight: 700 }} color="primary.main">
-                ₹{member.revenueGenerated}
-              </Typography>
+              <Tooltip title="Service Value Generated" arrow>
+                <Typography variant="subtitle2" sx={{ fontWeight: 700, cursor: 'help' }} color="primary.main">
+                  ₹{member.revenueGenerated}
+                </Typography>
+              </Tooltip>
             </ListItem>
           ))}
         </List>

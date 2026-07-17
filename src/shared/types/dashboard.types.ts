@@ -35,3 +35,20 @@ export interface DashboardSummaryResponse {
     revenueTrend: DailyRevenueDto[];
     popularServices: PopularServiceDto[];
 }
+
+export interface StaffLedgerItemDto {
+    appointmentId: number;
+    serviceId: number;
+    serviceName: string;
+    serviceStatus: string;
+    date: string;
+    serviceValue: number;
+}
+
+export interface StaffLedgerResponse {
+    staffId: number;
+    staffName: string;
+    servicesCompleted: number;
+    totalServiceValue: number;
+    services: StaffLedgerItemDto[];
+}
