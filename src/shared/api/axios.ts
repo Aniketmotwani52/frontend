@@ -5,7 +5,6 @@ export const api = axios.create({
   baseURL: import.meta.env.VITE_API_URL || '/api/v1', // Uses absolute AWS URL in production, or relative Vite proxy locally
   headers: {
     'Content-Type': 'application/json',
-    'ngrok-skip-browser-warning': 'true', // Bypasses the Ngrok warning page that breaks CORS
   },
 });
 

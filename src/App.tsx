@@ -4,7 +4,7 @@ import { ThemeProvider } from '@mui/material/styles';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { theme } from './app/providers/theme';
 import { AppRouter } from './app/routes/AppRouter';
-
+import { Analytics } from '@vercel/analytics/react';
 import { AuthProvider } from './app/providers/AuthContext';
 
 const queryClient = new QueryClient();
@@ -16,6 +16,7 @@ function App() {
         <AuthProvider>
           <BrowserRouter>
             <AppRouter />
+            <Analytics />
           </BrowserRouter>
         </AuthProvider>
       </ThemeProvider>
