@@ -66,6 +66,15 @@ export const LoginPage = () => {
           </Typography>
         </Box>
 
+        <Alert severity="info" sx={{ '& .MuiAlert-message': { width: '100%' } }}>
+          <Typography variant="body2" sx={{ fontWeight: 'bold' }}>Demo Credentials:</Typography>
+          <Typography variant="body2">Username: <strong>sarah</strong></Typography>
+          <Typography variant="body2">Password: <strong>password</strong></Typography>
+          <Typography variant="caption" sx={{ display: 'block', mt: 1, fontStyle: 'italic' }}>
+            * For the best experience, please use Desktop view.
+          </Typography>
+        </Alert>
+
         {error && <Alert severity="error">{error}</Alert>}
 
         <TextField

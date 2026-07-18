@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { theme } from './app/providers/theme';
 import { AppRouter } from './app/routes/AppRouter';
 import { Analytics } from '@vercel/analytics/react';
+import { SpeedInsights } from '@vercel/speed-insights/react';
 import { AuthProvider } from './app/providers/AuthContext';
 
 const queryClient = new QueryClient();
@@ -17,6 +18,7 @@ function App() {
           <BrowserRouter>
             <AppRouter />
             <Analytics />
+            <SpeedInsights />
           </BrowserRouter>
         </AuthProvider>
       </ThemeProvider>
